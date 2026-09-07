@@ -3,34 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Staff Documentation Portal</title>
-
   <link rel="stylesheet" href="styles.css" />
-
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </head>
-
 <body>
   <div id="app">
-
-    <!-- HEADER -->
     <header class="top-header">
       <div class="header-left">
         <div class="logo" id="logoBtn">
-          <img
-            src="https://cdn.discordapp.com/emojis/1494150868671529153.png"
-            alt="Logo"
-            width="28"
-            height="28"
-          />
-
+          <img src="https://cdn.discordapp.com/emojis/1494150868671529153.png" alt="Logo" width="28" height="28" />
           <div class="logo-text">
             <span class="logo-title">Staff Docs</span>
             <span class="logo-sub">Documentation Portal</span>
@@ -40,717 +24,263 @@
 
       <div class="header-center">
         <div class="search-wrap">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"></circle>
-            <line
-              x1="21"
-              y1="21"
-              x2="16.65"
-              y2="16.65"
-            ></line>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-
-          <input
-            type="text"
-            id="globalSearch"
-            placeholder="Search..."
-            autocomplete="off"
-          />
-
-          <div
-            id="searchResults"
-            class="search-results hidden"
-          ></div>
+          <input type="text" id="globalSearch" placeholder="Search..." autocomplete="off" />
+          <div id="searchResults" class="search-results hidden"></div>
         </div>
       </div>
 
       <div class="header-right">
-
-        <!-- DISCORD LOGIN -->
-        <a
-          id="loginBtn"
-          href="/api/auth/login"
-          class="btn btn-primary"
-        >
-          Login with Discord
-        </a>
-
-        <!-- LOGOUT -->
-        <a
-          id="logoutBtn"
-          href="/api/auth/logout"
-          class="btn btn-ghost hidden"
-        >
-          Logout
-        </a>
-
+        <a id="loginBtn" href="/api/auth/login" class="btn btn-primary">Login with Discord</a>
+        <button id="logoutBtn" class="btn btn-ghost hidden">Logout</button>
       </div>
     </header>
 
-    <!-- MAIN LAYOUT -->
     <div class="layout">
-
-      <!-- SIDEBAR -->
       <aside class="sidebar" id="sidebar">
-
-        <!-- HOME SIDEBAR -->
-        <div
-          id="sidebarHome"
-          class="sidebar-section"
-        >
-          <button
-            class="side-btn active"
-            data-view="departments"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+        <div id="sidebarHome" class="sidebar-section">
+          <button class="side-btn active" data-view="departments">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
-
             Staff Resources
           </button>
         </div>
 
-        <!-- DEPARTMENT SIDEBAR -->
-        <div
-          id="sidebarDept"
-          class="sidebar-section hidden"
-        >
-          <button
-            class="side-btn"
-            id="backToDepts"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+        <div id="sidebarDept" class="sidebar-section hidden">
+          <button class="side-btn" id="backToDepts">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-
             All Staff Sections
           </button>
 
-          <button
-            class="side-btn hidden"
-            id="newBookBtn"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="side-btn hidden" id="newBookBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-
             New Book
           </button>
 
-          <button
-            class="side-btn hidden"
-            id="editDeptBtn"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="side-btn hidden" id="editDeptBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-
             Edit Staff Resource
           </button>
 
-          <button
-            class="side-btn hidden"
-            id="deleteDeptBtn"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="side-btn hidden" id="deleteDeptBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
               <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-
             Delete Staff Resource
           </button>
         </div>
 
-        <!-- BOOK SIDEBAR -->
-        <div
-          id="sidebarBook"
-          class="sidebar-section hidden"
-        >
-          <button
-            class="side-btn"
-            id="backToDept"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+        <div id="sidebarBook" class="sidebar-section hidden">
+          <button class="side-btn" id="backToDept">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
-
             Back to Staff Resources
           </button>
 
-          <button
-            class="side-btn hidden"
-            id="editBookBtn"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="side-btn hidden" id="editBookBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-
             Edit Book
           </button>
 
-          <button
-            class="side-btn hidden"
-            id="deleteBookBtn"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
+          <button class="side-btn hidden" id="deleteBookBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
               <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-
             Delete Book
           </button>
         </div>
 
-        <!-- DETAILS -->
         <div class="sidebar-bottom">
-          <div
-            id="metaBox"
-            class="meta-box hidden"
-          >
+          <div id="metaBox" class="meta-box hidden">
             <h4>Details</h4>
             <div id="metaContent"></div>
           </div>
         </div>
-
       </aside>
 
-      <!-- MAIN CONTENT -->
       <main class="main">
-
-        <!-- DEPARTMENTS VIEW -->
-        <div
-          id="viewDepartments"
-          class="view"
-        >
+        <div id="viewDepartments" class="view">
           <div class="view-header">
             <div>
               <h1>Staff Resources</h1>
-              <p class="subtitle">
-                Select a section to view its documentation.
-              </p>
+              <p class="subtitle">Select a section to view its documentation.</p>
             </div>
-
-            <button
-              id="newDeptBtn"
-              class="btn btn-primary hidden"
-            >
-              + New Staff Resource
-            </button>
+            <button id="newDeptBtn" class="btn btn-primary hidden">+ New Staff Resource</button>
           </div>
 
-          <div
-            id="deptGrid"
-            class="card-grid"
-          ></div>
+          <div id="deptGrid" class="card-grid"></div>
 
-          <div
-            id="deptEmpty"
-            class="empty-state hidden"
-          >
+          <div id="deptEmpty" class="empty-state hidden">
             <p>No Staff Resources yet.</p>
-            <p class="hint">
-              Staff with permission can create the first resource.
-            </p>
+            <p class="hint">Staff with permission can create the first resource.</p>
           </div>
         </div>
 
-        <!-- DEPARTMENT DETAIL VIEW -->
-        <div
-          id="viewDeptDetail"
-          class="view hidden"
-        >
-          <div
-            class="breadcrumb"
-            id="deptBreadcrumb"
-          ></div>
+        <div id="viewDeptDetail" class="view hidden">
+          <div class="breadcrumb" id="deptBreadcrumb"></div>
 
           <div class="view-header">
             <div>
-              <h1 id="deptTitle">
-                Staff Resources
-              </h1>
-
-              <p
-                class="subtitle"
-                id="deptDesc"
-              ></p>
+              <h1 id="deptTitle">Staff Resources</h1>
+              <p class="subtitle" id="deptDesc"></p>
             </div>
           </div>
 
-          <div
-            id="bookGrid"
-            class="card-grid"
-          ></div>
+          <div id="bookGrid" class="card-grid"></div>
 
-          <div
-            id="bookEmpty"
-            class="empty-state hidden"
-          >
+          <div id="bookEmpty" class="empty-state hidden">
             <p>No books in this section yet.</p>
-            <p class="hint">
-              Staff with permission can create a new book.
-            </p>
+            <p class="hint">Staff with permission can create a new book.</p>
           </div>
         </div>
 
-        <!-- BOOK VIEW -->
-        <div
-          id="viewBook"
-          class="view hidden"
-        >
-          <div
-            class="breadcrumb"
-            id="bookBreadcrumb"
-          ></div>
+        <div id="viewBook" class="view hidden">
+          <div class="breadcrumb" id="bookBreadcrumb"></div>
 
           <div class="book-header">
             <div class="book-title-row">
-              <input
-                id="bookTitleInput"
-                class="book-title-input"
-                type="text"
-                readonly
-                placeholder="Book title"
-              />
-
-              <span
-                id="saveStatus"
-                class="save-status hidden"
-              ></span>
+              <input id="bookTitleInput" class="book-title-input" type="text" readonly placeholder="Book title" />
+              <span id="saveStatus" class="save-status hidden"></span>
             </div>
-
-            <p
-              id="bookDescDisplay"
-              class="book-desc"
-            ></p>
+            <p id="bookDescDisplay" class="book-desc"></p>
           </div>
 
-          <!-- EDITOR TOOLBAR -->
-          <div
-            id="formatBar"
-            class="format-bar hidden"
-          >
+          <div id="formatBar" class="format-bar hidden">
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="bold"
-                title="Bold"
-              >
-                <b>B</b>
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="italic"
-                title="Italic"
-              >
-                <i>I</i>
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="underline"
-                title="Underline"
-              >
-                <u>U</u>
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="strikeThrough"
-                title="Strikethrough"
-              >
-                <s>S</s>
-              </button>
+              <button type="button" class="format-btn" data-cmd="bold"><b>B</b></button>
+              <button type="button" class="format-btn" data-cmd="italic"><i>I</i></button>
+              <button type="button" class="format-btn" data-cmd="underline"><u>U</u></button>
+              <button type="button" class="format-btn" data-cmd="strikeThrough"><s>S</s></button>
             </div>
 
             <div class="format-divider"></div>
 
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="formatBlock"
-                data-value="h1"
-              >
-                H1
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="formatBlock"
-                data-value="h2"
-              >
-                H2
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="formatBlock"
-                data-value="h3"
-              >
-                H3
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="formatBlock"
-                data-value="p"
-              >
-                P
-              </button>
+              <button type="button" class="format-btn" data-cmd="formatBlock" data-value="h1">H1</button>
+              <button type="button" class="format-btn" data-cmd="formatBlock" data-value="h2">H2</button>
+              <button type="button" class="format-btn" data-cmd="formatBlock" data-value="h3">H3</button>
+              <button type="button" class="format-btn" data-cmd="formatBlock" data-value="p">P</button>
             </div>
 
             <div class="format-divider"></div>
 
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="insertUnorderedList"
-              >
-                • List
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="insertOrderedList"
-              >
-                1. List
-              </button>
+              <button type="button" class="format-btn" data-cmd="insertUnorderedList">• List</button>
+              <button type="button" class="format-btn" data-cmd="insertOrderedList">1. List</button>
             </div>
 
             <div class="format-divider"></div>
 
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="justifyLeft"
-              >
-                Left
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="justifyCenter"
-              >
-                Center
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="justifyRight"
-              >
-                Right
-              </button>
+              <button type="button" class="format-btn" data-cmd="justifyLeft">Left</button>
+              <button type="button" class="format-btn" data-cmd="justifyCenter">Center</button>
+              <button type="button" class="format-btn" data-cmd="justifyRight">Right</button>
             </div>
 
             <div class="format-divider"></div>
 
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                id="insertImageBtn"
-              >
-                Image
-              </button>
-
-              <input
-                type="file"
-                id="imageInput"
-                accept="image/*"
-                hidden
-              />
+              <button type="button" class="format-btn" id="insertImageBtn">Image</button>
+              <input type="file" id="imageInput" accept="image/*" hidden />
             </div>
 
             <div class="format-divider"></div>
 
             <div class="format-group">
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="undo"
-              >
-                Undo
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="redo"
-              >
-                Redo
-              </button>
-
-              <button
-                type="button"
-                class="format-btn"
-                data-cmd="removeFormat"
-              >
-                Clear
-              </button>
+              <button type="button" class="format-btn" data-cmd="undo">Undo</button>
+              <button type="button" class="format-btn" data-cmd="redo">Redo</button>
+              <button type="button" class="format-btn" data-cmd="removeFormat">Clear</button>
             </div>
           </div>
 
-          <div
-            id="bookContent"
-            class="book-content"
-            contenteditable="false"
-          ></div>
+          <div id="bookContent" class="book-content" contenteditable="false"></div>
         </div>
-
       </main>
     </div>
   </div>
 
-  <!-- DEPARTMENT MODAL -->
-  <div
-    id="deptModal"
-    class="modal hidden"
-  >
+  <div id="deptModal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-card modal-wide">
-      <h2 id="deptModalTitle">
-        New Resource
-      </h2>
+      <h2 id="deptModalTitle">New Resource</h2>
 
-      <label for="deptNameInput">
-        Name
-      </label>
+      <label for="deptNameInput">Name</label>
+      <input id="deptNameInput" type="text" placeholder="e.g. New South Wales Police Force" />
 
-      <input
-        id="deptNameInput"
-        type="text"
-        placeholder="e.g. New South Wales Police Force"
-      />
+      <label for="deptDescInput">Description</label>
+      <textarea id="deptDescInput" rows="3" placeholder="Short description of this department..."></textarea>
 
-      <label for="deptDescInput">
-        Description
-      </label>
-
-      <textarea
-        id="deptDescInput"
-        rows="3"
-        placeholder="Short description of this department..."
-      ></textarea>
-
-      <label for="deptImageInput">
-        Cover Image
-      </label>
-
+      <label for="deptImageInput">Cover Image</label>
       <div class="image-upload-row">
-        <input
-          type="file"
-          id="deptImageInput"
-          accept="image/*"
-        />
-
-        <div
-          id="deptImagePreview"
-          class="img-preview hidden"
-        ></div>
+        <input type="file" id="deptImageInput" accept="image/*" />
+        <div id="deptImagePreview" class="img-preview hidden"></div>
       </div>
 
       <div class="modal-actions">
-        <button
-          id="cancelDeptBtn"
-          class="btn btn-ghost"
-        >
-          Cancel
-        </button>
-
-        <button
-          id="saveDeptBtn"
-          class="btn btn-primary"
-        >
-          Save
-        </button>
+        <button id="cancelDeptBtn" class="btn btn-ghost">Cancel</button>
+        <button id="saveDeptBtn" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- BOOK MODAL -->
-  <div
-    id="bookModal"
-    class="modal hidden"
-  >
+  <div id="bookModal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-card modal-wide">
-      <h2 id="bookModalTitle">
-        New Book
-      </h2>
+      <h2 id="bookModalTitle">New Book</h2>
 
-      <label for="bookNameInput">
-        Title
-      </label>
+      <label for="bookNameInput">Title</label>
+      <input id="bookNameInput" type="text" placeholder="e.g. Equipment Policy" />
 
-      <input
-        id="bookNameInput"
-        type="text"
-        placeholder="e.g. Equipment Policy"
-      />
+      <label for="bookDescInput">Short Description</label>
+      <textarea id="bookDescInput" rows="2" placeholder="One-line description shown on the card..."></textarea>
 
-      <label for="bookDescInput">
-        Short Description
-      </label>
-
-      <textarea
-        id="bookDescInput"
-        rows="2"
-        placeholder="One-line description shown on the card..."
-      ></textarea>
-
-      <label for="bookCoverInput">
-        Cover Image
-      </label>
-
+      <label for="bookCoverInput">Cover Image</label>
       <div class="image-upload-row">
-        <input
-          type="file"
-          id="bookCoverInput"
-          accept="image/*"
-        />
-
-        <div
-          id="bookCoverPreview"
-          class="img-preview hidden"
-        ></div>
+        <input type="file" id="bookCoverInput" accept="image/*" />
+        <div id="bookCoverPreview" class="img-preview hidden"></div>
       </div>
 
       <div class="modal-actions">
-        <button
-          id="cancelBookBtn"
-          class="btn btn-ghost"
-        >
-          Cancel
-        </button>
-
-        <button
-          id="saveBookMetaBtn"
-          class="btn btn-primary"
-        >
-          Save
-        </button>
+        <button id="cancelBookBtn" class="btn btn-ghost">Cancel</button>
+        <button id="saveBookMetaBtn" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- DELETE MODAL -->
-  <div
-    id="deleteModal"
-    class="modal hidden"
-  >
+  <div id="deleteModal" class="modal hidden">
     <div class="modal-backdrop"></div>
-
     <div class="modal-card">
       <h2>Delete?</h2>
-
-      <p id="deleteMessage">
-        This cannot be undone.
-      </p>
+      <p id="deleteMessage">This cannot be undone.</p>
 
       <div class="modal-actions">
-        <button
-          id="cancelDeleteBtn"
-          class="btn btn-ghost"
-        >
-          Cancel
-        </button>
-
-        <button
-          id="confirmDeleteBtn"
-          class="btn btn-danger"
-        >
-          Delete
-        </button>
+        <button id="cancelDeleteBtn" class="btn btn-ghost">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn btn-danger">Delete</button>
       </div>
     </div>
   </div>
 
-  <!-- JAVASCRIPT -->
   <script src="app.js"></script>
 </body>
 </html>
