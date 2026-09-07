@@ -1,6 +1,6 @@
 const OWNER_ID = '1334272703347294210';
 
-const PERMS = [
+const PERMISSIONS = [
   'view_books',
   'create_books',
   'edit_books',
@@ -10,19 +10,21 @@ const PERMS = [
   'manage_settings'
 ];
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
+const COOKIE_NAME = 'pmb_session';
+const SESSION_DAYS = 7;
 
-function json(body, status = 200, origin = '') {
-  return new Response(JSON.stringify(body), {
+function json(data, status = 200, request) {
+  const origin = new URL(request.url).origin;
+
+  return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': origin,
-      ...CORS_HEADERS
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
     }
   });
 }
@@ -32,7 +34,7 @@ function redirect(url, cookies = []) {
     Location: url
   };
 
-  if (cookies.length > 0) {
+  if (cookies.length) {
     headers['Set-Cookie'] = cookies;
   }
 
@@ -43,10 +45,10 @@ function redirect(url, cookies = []) {
 }
 
 function getCookie(request, name) {
-  const cookies = request.headers.get('Cookie') || '';
+  const header = request.headers.get('Cookie') || '';
 
-  for (const item of cookies.split(';')) {
-    const [key, ...value] = item.trim().split('=');
+  for (const part of header.split(';')) {
+    const [key, ...value] = part.trim().split('=');
 
     if (key === name) {
       return value.join('=');
@@ -56,7 +58,84 @@ function getCookie(request, name) {
   return null;
 }
 
-async function discordRequest(path, env, options = {}) {
+function makeSessionCookie(token) {
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`;
+}
+
+function clearSessionCookie() {
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+}
+
+async function getSession(request, env) {
+  const token = getCookie(request, COOKIE_NAME);
+
+  if (!token) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const result = await env.DB
+    .prepare(`
+      SELECT
+        s.token,
+        s.discord_id,
+        s.expires_at,
+        u.username,
+        u.avatar
+      FROM sessions s
+      LEFT JOIN users u
+        ON u.discord_id = s.discord_id
+      WHERE s.token = ?
+        AND s.expires_at > ?
+    `)
+    .bind(token, now)
+    .first();
+
+  return result || null;
+}
+
+async function getPermissions(user, env) {
+  if (!user) {
+    return [];
+  }
+
+  if (user.discord_id === OWNER_ID) {
+    return [...PERMISSIONS];
+  }
+
+  try {
+    const result = await env.DB
+      .prepare(`
+        SELECT DISTINCT rp.permission
+        FROM role_permissions rp
+        INNER JOIN user_roles ur
+          ON ur.role_id = rp.role_id
+        WHERE ur.discord_id = ?
+      `)
+      .bind(user.discord_id)
+      .all();
+
+    return (result.results || []).map(
+      row => row.permission
+    );
+  } catch (error) {
+    console.error('Permission lookup failed:', error);
+    return [];
+  }
+}
+
+function can(user, permissions, permission) {
+  return (
+    user &&
+    (
+      user.discord_id === OWNER_ID ||
+      permissions.includes(permission)
+    )
+  );
+}
+
+async function discordAPI(path, env, options = {}) {
   return fetch(`https://discord.com/api/v10${path}`, {
     ...options,
     headers: {
@@ -66,83 +145,58 @@ async function discordRequest(path, env, options = {}) {
   });
 }
 
-async function getSession(request, env) {
-  const token = getCookie(request, 'pmb_session');
-
-  if (!token) {
-    return null;
+async function updateDiscordRoles(userId, env) {
+  /*
+   * DISCORD_GUILD_ID should be the ID of your Discord server.
+   * The bot must be in that server.
+   */
+  if (!env.DISCORD_GUILD_ID) {
+    console.error('DISCORD_GUILD_ID is missing.');
+    return;
   }
 
-  const now = Math.floor(Date.now() / 1000);
-
-  const session = await env.DB
-    .prepare(
-      `
-      SELECT *
-      FROM sessions
-      WHERE token = ?
-      AND expires_at > ?
-      `
-    )
-    .bind(token, now)
-    .first();
-
-  return session || null;
-}
-
-async function getPermissions(request, env, user) {
-  if (!user) {
-    return [];
-  }
-
-  if (user.discord_id === OWNER_ID) {
-    return [...PERMS];
-  }
-
-  const result = await env.DB
-    .prepare(
-      `
-      SELECT DISTINCT rp.permission
-      FROM role_permissions rp
-      INNER JOIN user_roles ur
-        ON ur.role_id = rp.role_id
-      WHERE ur.discord_id = ?
-      `
-    )
-    .bind(user.discord_id)
-    .all();
-
-  return [
-    ...new Set(
-      (result.results || []).map((row) => row.permission)
-    )
-  ];
-}
-
-function hasPermission(permissions, permission) {
-  return permissions.includes(permission);
-}
-
-async function getDiscordGuilds(accessToken) {
-  const response = await fetch(
-    'https://discord.com/api/users/@me/guilds',
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    }
+  const response = await discordAPI(
+    `/guilds/${env.DISCORD_GUILD_ID}/members/${userId}`,
+    env
   );
 
   if (!response.ok) {
+    console.error(
+      'Could not retrieve Discord member:',
+      response.status
+    );
+    return;
+  }
+
+  const member = await response.json();
+
+  await env.DB
+    .prepare(`
+      DELETE FROM user_roles
+      WHERE discord_id = ?
+    `)
+    .bind(userId)
+    .run();
+
+  for (const roleId of member.roles || []) {
+    await env.DB
+      .prepare(`
+        INSERT OR IGNORE INTO user_roles
+          (discord_id, role_id)
+        VALUES (?, ?)
+      `)
+      .bind(userId, roleId)
+      .run();
+  }
+}
+
+async function getDiscordRoles(env) {
+  if (!env.DISCORD_GUILD_ID) {
     return [];
   }
 
-  return response.json();
-}
-
-async function getDiscordRoles(guildId, env) {
-  const response = await discordRequest(
-    `/guilds/${guildId}/roles`,
+  const response = await discordAPI(
+    `/guilds/${env.DISCORD_GUILD_ID}/roles`,
     env
   );
 
@@ -156,34 +210,36 @@ async function getDiscordRoles(guildId, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const origin = url.origin;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
         headers: {
-          ...CORS_HEADERS,
-          'Access-Control-Allow-Origin': origin
+          'Access-Control-Allow-Origin': url.origin,
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Allow-Methods':
+            'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
         }
       });
     }
 
     /*
-     * Discord login
+     * DISCORD LOGIN
      */
     if (url.pathname === '/api/auth/login') {
-      const loginURL =
+      const discordURL =
         'https://discord.com/oauth2/authorize' +
         `?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}` +
         '&response_type=code' +
         `&redirect_uri=${encodeURIComponent(env.DISCORD_REDIRECT_URI)}` +
         '&scope=identify%20guilds';
 
-      return redirect(loginURL);
+      return redirect(discordURL);
     }
 
     /*
-     * Discord callback
+     * DISCORD CALLBACK
      */
     if (url.pathname === '/api/auth/callback') {
       try {
@@ -213,9 +269,9 @@ export default {
 
         const tokenData = await tokenResponse.json();
 
-        if (!tokenData.access_token) {
+        if (!tokenResponse.ok || !tokenData.access_token) {
           console.error(
-            'Discord token error:',
+            'Discord OAuth token error:',
             JSON.stringify(tokenData)
           );
 
@@ -234,7 +290,12 @@ export default {
 
         const discordUser = await userResponse.json();
 
-        if (!discordUser.id) {
+        if (!userResponse.ok || !discordUser.id) {
+          console.error(
+            'Discord user lookup failed:',
+            JSON.stringify(discordUser)
+          );
+
           return redirect('/?login=failed');
         }
 
@@ -242,8 +303,7 @@ export default {
         const sessionToken = crypto.randomUUID();
 
         await env.DB
-          .prepare(
-            `
+          .prepare(`
             INSERT INTO users
               (discord_id, username, avatar, updated_at)
             VALUES (?, ?, ?, ?)
@@ -252,8 +312,7 @@ export default {
               username = excluded.username,
               avatar = excluded.avatar,
               updated_at = excluded.updated_at
-            `
-          )
+          `)
           .bind(
             discordUser.id,
             discordUser.username || 'Unknown User',
@@ -263,162 +322,122 @@ export default {
           .run();
 
         await env.DB
-          .prepare(
-            `
+          .prepare(`
             INSERT INTO sessions
               (token, discord_id, expires_at)
             VALUES (?, ?, ?)
-            `
-          )
+          `)
           .bind(
             sessionToken,
             discordUser.id,
-            now + 604800
+            now + SESSION_DAYS * 86400
           )
           .run();
 
         /*
-         * Store the user's Discord server roles.
-         * This allows role permissions to be checked later.
+         * This is deliberately separate from OAuth.
+         * OAuth logs the user in first.
+         * The bot then checks the user's roles.
          */
-        const guilds = await getDiscordGuilds(
-          tokenData.access_token
-        );
-
-        for (const guild of guilds) {
-          const roles = await getDiscordRoles(
-            guild.id,
+        try {
+          await updateDiscordRoles(
+            discordUser.id,
             env
           );
-
-          for (const role of roles) {
-            const memberResponse = await discordRequest(
-              `/guilds/${guild.id}/members/${discordUser.id}`,
-              env
-            );
-
-            if (!memberResponse.ok) {
-              continue;
-            }
-
-            const member = await memberResponse.json();
-
-            if (
-              Array.isArray(member.roles) &&
-              member.roles.includes(role.id)
-            ) {
-              await env.DB
-                .prepare(
-                  `
-                  INSERT OR IGNORE INTO user_roles
-                    (discord_id, role_id)
-                  VALUES (?, ?)
-                  `
-                )
-                .bind(discordUser.id, role.id)
-                .run();
-            }
-          }
+        } catch (roleError) {
+          console.error(
+            'Discord role sync failed:',
+            roleError
+          );
         }
 
         return redirect('/', [
-          `pmb_session=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
+          makeSessionCookie(sessionToken)
         ]);
       } catch (error) {
-        console.error('Discord callback error:', error);
+        console.error(
+          'Discord callback exception:',
+          error
+        );
+
         return redirect('/?login=failed');
       }
     }
 
     /*
-     * Logout
+     * LOGOUT
      */
     if (url.pathname === '/api/auth/logout') {
-      const token = getCookie(request, 'pmb_session');
+      const token = getCookie(request, COOKIE_NAME);
 
       if (token) {
         await env.DB
-          .prepare('DELETE FROM sessions WHERE token = ?')
+          .prepare(`
+            DELETE FROM sessions
+            WHERE token = ?
+          `)
           .bind(token)
           .run();
       }
 
       return redirect('/', [
-        'pmb_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+        clearSessionCookie()
       ]);
     }
 
     /*
-     * API routes
+     * CURRENT USER
+     */
+    if (url.pathname === '/api/me') {
+      const user = await getSession(request, env);
+      const permissions = await getPermissions(user, env);
+
+      return json({
+        loggedIn: Boolean(user),
+        user: user
+          ? {
+              discord_id: user.discord_id,
+              username: user.username,
+              avatar: user.avatar
+            }
+          : null,
+        permissions
+      }, 200, request);
+    }
+
+    /*
+     * ALL OTHER API ROUTES REQUIRE LOGIN
      */
     if (url.pathname.startsWith('/api/')) {
       const user = await getSession(request, env);
 
-      /*
-       * Current logged-in user
-       */
-      if (url.pathname === '/api/me') {
-        return json(
-          {
-            loggedIn: Boolean(user),
-            user: user
-              ? {
-                  discord_id: user.discord_id,
-                  username: user.username,
-                  avatar: user.avatar
-                }
-              : null,
-            permissions: await getPermissions(
-              request,
-              env,
-              user
-            )
-          },
-          200,
-          origin
-        );
-      }
-
       if (!user) {
-        return json(
-          {
-            error: 'Login required'
-          },
-          401,
-          origin
-        );
+        return json({
+          error: 'Login required'
+        }, 401, request);
       }
 
-      const permissions = await getPermissions(
-        request,
-        env,
-        user
-      );
+      const permissions = await getPermissions(user, env);
 
       /*
-       * Shared books and departments data
+       * SHARED DATA
+       *
+       * Uses the original site_data table.
        */
       if (url.pathname === '/api/data') {
         if (request.method === 'GET') {
-          if (
-            !hasPermission(
-              permissions,
-              'view_books'
-            )
-          ) {
-            return json(
-              {
-                error: 'You do not have permission to view books.'
-              },
-              403,
-              origin
-            );
+          if (!can(user, permissions, 'view_books')) {
+            return json({
+              error: 'You do not have permission to view books.'
+            }, 403, request);
           }
 
           const row = await env.DB
-            .prepare(
-              'SELECT data FROM portal_data WHERE id = 1'
-            )
+            .prepare(`
+              SELECT data
+              FROM site_data
+              WHERE id = 1
+            `)
             .first();
 
           return json(
@@ -429,176 +448,144 @@ export default {
                   books: []
                 },
             200,
-            origin
+            request
           );
         }
 
         if (request.method === 'PUT') {
-          if (
-            !hasPermission(
-              permissions,
-              'edit_books'
-            )
-          ) {
-            return json(
-              {
-                error: 'You do not have permission to edit books.'
-              },
-              403,
-              origin
-            );
+          if (!can(user, permissions, 'edit_books')) {
+            return json({
+              error: 'You do not have permission to edit books.'
+            }, 403, request);
           }
 
-          const newData = await request.json();
+          const data = await request.json();
 
           await env.DB
-            .prepare(
-              `
-              INSERT INTO portal_data
+            .prepare(`
+              INSERT INTO site_data
                 (id, data, updated_at)
-              VALUES (1, ?, ?)
+              VALUES (1, ?, CURRENT_TIMESTAMP)
               ON CONFLICT(id)
               DO UPDATE SET
                 data = excluded.data,
-                updated_at = excluded.updated_at
-              `
-            )
-            .bind(
-              JSON.stringify(newData),
-              Math.floor(Date.now() / 1000)
-            )
+                updated_at = CURRENT_TIMESTAMP
+            `)
+            .bind(JSON.stringify(data))
             .run();
 
-          return json(
-            {
-              ok: true
-            },
-            200,
-            origin
-          );
+          return json({
+            ok: true
+          }, 200, request);
         }
       }
 
       /*
-       * Discord roles
+       * DISCORD ROLES
+       */
+      if (
+        url.pathname === '/api/discord/roles' &&
+        request.method === 'GET'
+      ) {
+        if (!can(user, permissions, 'manage_users')) {
+          return json({
+            error: 'You do not have permission to manage users.'
+          }, 403, request);
+        }
+
+        const roles = await getDiscordRoles(env);
+
+        return json(roles, 200, request);
+      }
+
+      /*
+       * SAVED ROLE PERMISSIONS
        */
       if (
         url.pathname === '/api/roles' &&
         request.method === 'GET'
       ) {
-        if (
-          !hasPermission(
-            permissions,
-            'manage_users'
-          )
-        ) {
-          return json(
-            {
-              error: 'You do not have permission to manage roles.'
-            },
-            403,
-            origin
-          );
+        if (!can(user, permissions, 'manage_users')) {
+          return json({
+            error: 'You do not have permission to manage users.'
+          }, 403, request);
         }
 
-        const rows = await env.DB
-          .prepare(
-            `
-            SELECT *
+        const result = await env.DB
+          .prepare(`
+            SELECT role_id, permission
             FROM role_permissions
-            ORDER BY role_id
-            `
-          )
+            ORDER BY role_id, permission
+          `)
           .all();
 
         return json(
-          rows.results || [],
+          result.results || [],
           200,
-          origin
+          request
         );
       }
 
       /*
-       * Save permissions for a Discord role
+       * SAVE ROLE PERMISSIONS
        */
       if (
         url.pathname === '/api/roles' &&
         request.method === 'PUT'
       ) {
-        if (
-          !hasPermission(
-            permissions,
-            'manage_users'
-          )
-        ) {
-          return json(
-            {
-              error: 'You do not have permission to manage roles.'
-            },
-            403,
-            origin
-          );
+        if (!can(user, permissions, 'manage_users')) {
+          return json({
+            error: 'You do not have permission to manage users.'
+          }, 403, request);
         }
 
         const body = await request.json();
 
         if (!body.role_id) {
-          return json(
-            {
-              error: 'A role ID is required.'
-            },
-            400,
-            origin
-          );
+          return json({
+            error: 'role_id is required.'
+          }, 400, request);
         }
 
+        const selectedPermissions = Array.isArray(
+          body.permissions
+        )
+          ? body.permissions.filter(permission =>
+              PERMISSIONS.includes(permission)
+            )
+          : [];
+
         await env.DB
-          .prepare(
-            `
+          .prepare(`
             DELETE FROM role_permissions
             WHERE role_id = ?
-            `
-          )
+          `)
           .bind(body.role_id)
           .run();
 
-        for (const permission of body.permissions || []) {
-          if (!PERMS.includes(permission)) {
-            continue;
-          }
-
+        for (const permission of selectedPermissions) {
           await env.DB
-            .prepare(
-              `
-              INSERT INTO role_permissions
+            .prepare(`
+              INSERT OR IGNORE INTO role_permissions
                 (role_id, permission)
               VALUES (?, ?)
-              `
-            )
+            `)
             .bind(body.role_id, permission)
             .run();
         }
 
-        return json(
-          {
-            ok: true
-          },
-          200,
-          origin
-        );
+        return json({
+          ok: true
+        }, 200, request);
       }
 
-      return json(
-        {
-          error: 'API route not found'
-        },
-        404,
-        origin
-      );
+      return json({
+        error: 'API route not found'
+      }, 404, request);
     }
 
     /*
-     * Serve the website.
+     * SERVE THE WEBSITE
      */
     if (!env.ASSETS) {
       return new Response(
