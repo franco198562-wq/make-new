@@ -923,9 +923,15 @@ function runSearch(query) {
 // Events
 // ==============================
 
+const DISCORD_REDIRECT_URI =
+  "https://pmb.franco198562.workers.dev/api/auth/callback";
+
 $("#loginBtn")?.addEventListener("click", event => {
   event.preventDefault();
-  window.location.href = "/api/auth/login";
+
+  window.location.href =
+    "/api/auth/login?redirect_uri=" +
+    encodeURIComponent(DISCORD_REDIRECT_URI);
 });
 
 $("#logoutBtn")?.addEventListener("click", event => {
