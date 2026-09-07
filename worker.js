@@ -119,9 +119,7 @@ async function getPermissions(user, env) {
       .bind(user.discord_id)
       .all();
 
-    return (result.results || []).map(
-      row => row.permission
-    );
+    return (result.results || []).map(row => row.permission);
   } catch (error) {
     console.error('Permission lookup failed:', error);
     return [];
@@ -129,7 +127,7 @@ async function getPermissions(user, env) {
 }
 
 function can(user, permissions, permission) {
-  return (
+  return Boolean(
     user &&
     (
       user.discord_id === OWNER_ID ||
@@ -149,10 +147,6 @@ async function discordAPI(path, env, options = {}) {
 }
 
 async function updateDiscordRoles(userId, env) {
-  /*
-   * DISCORD_GUILD_ID should be the ID of your Discord server.
-   * The bot must be in that server.
-   */
   if (!env.DISCORD_GUILD_ID) {
     console.error('DISCORD_GUILD_ID is missing.');
     return;
@@ -166,8 +160,10 @@ async function updateDiscordRoles(userId, env) {
   if (!response.ok) {
     console.error(
       'Could not retrieve Discord member:',
-      response.status
+      response.status,
+      await response.text()
     );
+
     return;
   }
 
@@ -204,6 +200,12 @@ async function getDiscordRoles(env) {
   );
 
   if (!response.ok) {
+    console.error(
+      'Could not retrieve Discord roles:',
+      response.status,
+      await response.text()
+    );
+
     return [];
   }
 
@@ -231,11 +233,26 @@ export default {
      * DISCORD LOGIN
      */
     if (url.pathname === '/api/auth/login') {
+      if (
+        !env.DISCORD_CLIENT_ID ||
+        !env.DISCORD_CLIENT_SECRET
+      ) {
+        return new Response(
+          'DISCORD_CLIENT_ID or DISCORD_CLIENT_SECRET is missing in Cloudflare.',
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'text/plain'
+            }
+          }
+        );
+      }
+
       const discordURL =
         'https://discord.com/oauth2/authorize' +
         `?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}` +
         '&response_type=code' +
-        `&redirect_uri=${encodeURIComponent(env.DISCORD_REDIRECT_URI)}` +
+        `&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}` +
         '&scope=identify%20guilds';
 
       return redirect(discordURL);
@@ -247,46 +264,100 @@ export default {
     if (url.pathname === '/api/auth/callback') {
       try {
         const code = url.searchParams.get('code');
+        const returnedError = url.searchParams.get('error');
+
+        if (returnedError) {
+          return new Response(
+            `Discord login failed: ${returnedError}`,
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'text/plain'
+              }
+            }
+          );
+        }
 
         if (!code) {
-          return redirect('/?login=failed');
+          return new Response(
+            'Discord login failed: no authorization code was received.',
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'text/plain'
+              }
+            }
+          );
+        }
+
+        if (
+          !env.DISCORD_CLIENT_ID ||
+          !env.DISCORD_CLIENT_SECRET
+        ) {
+          return new Response(
+            'Cloudflare is missing DISCORD_CLIENT_ID or DISCORD_CLIENT_SECRET.',
+            {
+              status: 500,
+              headers: {
+                'Content-Type': 'text/plain'
+              }
+            }
+          );
         }
 
         const tokenResponse = await fetch(
-          'https://discord.com/api/oauth2/token',
+          'https://discord.com/api/v10/oauth2/token',
           {
             method: 'POST',
             headers: {
-              'Content-Type':
-                'application/x-www-form-urlencoded'
+              'Content-Type': 'application/x-www-form-urlencoded'
             },
             body: new URLSearchParams({
-              client_id: env.DISCORD_CLIENT_ID,
-              client_secret: env.DISCORD_CLIENT_SECRET,
+              client_id: String(env.DISCORD_CLIENT_ID).trim(),
+              client_secret: String(env.DISCORD_CLIENT_SECRET).trim(),
               grant_type: 'authorization_code',
-              code,
-              redirect_uri: env.DISCORD_REDIRECT_URI
-            })
+              code: String(code),
+              redirect_uri: DISCORD_REDIRECT_URI
+            }).toString()
           }
         );
 
-        const tokenData = await tokenResponse.json();
+        const tokenText = await tokenResponse.text();
+
+        let tokenData;
+
+        try {
+          tokenData = JSON.parse(tokenText);
+        } catch {
+          tokenData = {
+            raw: tokenText
+          };
+        }
 
         if (!tokenResponse.ok || !tokenData.access_token) {
           console.error(
-            'Discord OAuth token error:',
+            'Discord OAuth token exchange failed:',
+            tokenResponse.status,
             JSON.stringify(tokenData)
           );
 
-          return redirect('/?login=failed');
+          return new Response(
+            `Discord OAuth failed (${tokenResponse.status}): ${JSON.stringify(tokenData)}`,
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'text/plain'
+              }
+            }
+          );
         }
 
         const userResponse = await fetch(
-          'https://discord.com/api/users/@me',
+          'https://discord.com/api/v10/users/@me',
           {
+            method: 'GET',
             headers: {
-              Authorization:
-                `Bearer ${tokenData.access_token}`
+              Authorization: `Bearer ${tokenData.access_token}`
             }
           }
         );
@@ -296,10 +367,19 @@ export default {
         if (!userResponse.ok || !discordUser.id) {
           console.error(
             'Discord user lookup failed:',
+            userResponse.status,
             JSON.stringify(discordUser)
           );
 
-          return redirect('/?login=failed');
+          return new Response(
+            `Discord user lookup failed: ${JSON.stringify(discordUser)}`,
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'text/plain'
+              }
+            }
+          );
         }
 
         const now = Math.floor(Date.now() / 1000);
@@ -337,11 +417,6 @@ export default {
           )
           .run();
 
-        /*
-         * This is deliberately separate from OAuth.
-         * OAuth logs the user in first.
-         * The bot then checks the user's roles.
-         */
         try {
           await updateDiscordRoles(
             discordUser.id,
@@ -363,7 +438,15 @@ export default {
           error
         );
 
-        return redirect('/?login=failed');
+        return new Response(
+          `Discord callback error: ${error.message}`,
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'text/plain'
+            }
+          }
+        );
       }
     }
 
@@ -424,8 +507,6 @@ export default {
 
       /*
        * SHARED DATA
-       *
-       * Uses the original site_data table.
        */
       if (url.pathname === '/api/data') {
         if (request.method === 'GET') {
@@ -443,13 +524,21 @@ export default {
             `)
             .first();
 
+          let savedData = {
+            departments: [],
+            books: []
+          };
+
+          if (row?.data) {
+            try {
+              savedData = JSON.parse(row.data);
+            } catch (error) {
+              console.error('Invalid saved site data:', error);
+            }
+          }
+
           return json(
-            row
-              ? JSON.parse(row.data)
-              : {
-                  departments: [],
-                  books: []
-                },
+            savedData,
             200,
             request
           );
@@ -462,7 +551,7 @@ export default {
             }, 403, request);
           }
 
-          const data = await request.json();
+          const savedData = await request.json();
 
           await env.DB
             .prepare(`
@@ -474,7 +563,7 @@ export default {
                 data = excluded.data,
                 updated_at = CURRENT_TIMESTAMP
             `)
-            .bind(JSON.stringify(data))
+            .bind(JSON.stringify(savedData))
             .run();
 
           return json({
