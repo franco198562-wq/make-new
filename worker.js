@@ -1,5 +1,8 @@
 const OWNER_ID = '1334272703347294210';
 
+const DISCORD_REDIRECT_URI =
+  'https://pmb.franco198562.workers.dev/api/auth/callback';
+
 const PERMISSIONS = [
   'view_books',
   'create_books',
